@@ -1,0 +1,48 @@
+# A systemd unit file for NeedleThreads. systemd starts services on boot and
+# restarts them when they crash, so your app keeps running after you close your
+# SSH session.
+#
+# setup-ec2.sh copies this to /etc/systemd/system/needlethreads.service.
+# Useful commands once it is installed:
+#   sudo systemctl status needlethreads     # is it running?
+#   sudo systemctl restart needlethreads    # restart after a deploy
+#   journalctl -u needlethreads -f          # follow the logs
+
+[Unit]
+Description=NeedleThreads Cosplay & Craft Build Logs App
+After=network.target
+
+[Service]
+Type=simple
+
+# Run as an unprivileged user that only exists to run this app. If someone finds
+# a hole in the app, they get this account and nothing more.
+User=needlethreads
+Group=needlethreads
+
+WorkingDirectory=/opt/needlethreads
+ExecStart=/usr/bin/node server/server.js
+
+# Environment variables read by server/server.js and database connection
+Environment=NODE_ENV=production
+Environment=PORT=3000
+Environment=DB_PATH=/opt/needlethreads/data/needlethreads.db
+
+# If the app crashes, start it again after 5 seconds.
+Restart=always
+RestartSec=5
+
+# Send console.log output to the system journal.
+StandardOutput=journal
+StandardError=journal
+
+# Systemd security hardening. The app can only write to its own data directory
+# where the SQLite database lives.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/needlethreads/data
+
+[Install]
+WantedBy=multi-user.target
