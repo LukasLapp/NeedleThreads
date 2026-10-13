@@ -71,17 +71,25 @@ echo "==> Copying files to ${TARGET}:${REMOTE_DIR}"
 # --delete removes files on the server that you deleted locally.
 # Excludes keep local-only things out: node_modules is rebuilt on the server,
 # and data/ (SQLite DB) belongs to the server environment.
-rsync -az --delete \
-    --exclude '.git' \
-    --exclude 'node_modules' \
-    --exclude 'data' \
-    --exclude '*.db' \
-    --exclude '*.db-journal' \
-    --exclude '.env' \
-    --exclude '.DS_Store' \
-    --exclude '*.log' \
-    -e "ssh ${SSH_OPTS[*]}" \
-    ./ "${TARGET}:${REMOTE_DIR}/"
+echo "==> Creating deployment archive..."
+tar -czf deploy_bundle.tar.gz \
+    --exclude='.git' \
+    --exclude='node_modules' \
+    --exclude='data' \
+    --exclude='*.db' \
+    --exclude='*.db-journal' \
+    --exclude='.env' \
+    --exclude='.DS_Store' \
+    .
+
+echo "==> Uploading and extracting on server..."
+scp "${SSH_OPTS[@]}" deploy_bundle.tar.gz "${TARGET}:/tmp/"
+ssh "${SSH_OPTS[@]}" "$TARGET" "
+    sudo tar -xzf /tmp/deploy_bundle.tar.gz -C '${REMOTE_DIR}'
+    sudo chown -R ${REMOTE_USER}:${REMOTE_USER} '${REMOTE_DIR}'
+    rm -f /tmp/deploy_bundle.tar.gz
+"
+rm -f deploy_bundle.tar.gz
 
 echo "==> Installing dependencies and restarting the service"
 ssh "${SSH_OPTS[@]}" "$TARGET" "
