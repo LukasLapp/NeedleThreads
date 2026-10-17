@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node server/server.js",
-    "test": "echo \"No tests configured yet\" && exit 0"
+    "test": "jest --runInBand --detectOpenHandles"
   },
   "repository": {
     "type": "git",

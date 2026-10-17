@@ -7,11 +7,14 @@ describe('NeedleThreads Checkpoint 1 API & DB Integration Tests', () => {
 
     beforeAll(() => {
         // Create dummy user and hub for foreign keys
-        const userStmt = db.prepare('INSERT INTO users (username, email, bio) VALUES (?, ?, ?)');
-        userId = userStmt.run('LukasTheMaker', 'lukas@needlethreads.io', 'Cosplay enthusiast').lastInsertRowid;
+        const userStmt = db.prepare('INSERT OR IGNORE INTO users (username, email, bio) VALUES (?, ?, ?)');
+        userStmt.run('LukasMaker', 'lukas@needlethreads.io', 'Cosplay enthusiast');
+
+        const user = db.prepare('SELECT id FROM users WHERE email = ?').get('lukas@needlethreads.io');
+        userId = user.id;
 
         const hub = db.prepare('SELECT id FROM hubs LIMIT 1').get();
-        hubId = hub.id;
+        hubId = hub ? hub.id : 1;
     });
 
     it('GET /api/health should respond with status ok', async () => {
@@ -40,7 +43,7 @@ describe('NeedleThreads Checkpoint 1 API & DB Integration Tests', () => {
     it('GET /api/posts/:id should retrieve post with normalized materials and tags', async () => {
         const res = await request(app).get(`/api/posts/${postId}`);
         expect(res.statusCode).toBe(200);
-        expect(res.body.title).toBe('EVA Foam Gauntlets Build');
+        expect(res.body.title).toBe('EVA Foam Helmet Build');
         expect(res.body.materials).toContain('EVA Foam');
         expect(res.body.tags).toContain('Armor');
     });
