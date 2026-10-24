@@ -7,7 +7,7 @@ export default function Header() {
         <Navbar bg="dark" variant="dark" expand="lg" sticky="top">
             <Container>
                 <LinkContainer to="/">
-                    <Navbar.Brand className="fw-bold fs-4">🪡 NeedleThreads</Navbar.Brand>
+                    <Navbar.Brand className="fw-bold fs-4"> NeedleThreads</Navbar.Brand>
                 </LinkContainer>
                 <Navbar.Toggle aria-controls="navbar-nav" />
                 <Navbar.Collapse id="navbar-nav">
