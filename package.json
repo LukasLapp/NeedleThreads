@@ -4,6 +4,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node server/server.js",
+    "build": "esbuild src/index.js --bundle --outfile=public/bundle.js --loader:.js=jsx --loader:.jsx=jsx --minify",
     "test": "jest --runInBand --detectOpenHandles"
   },
   "repository": {
@@ -31,6 +32,7 @@
     "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
+    "esbuild": "^0.28.2",
     "jest": "^29.7.0",
     "supertest": "^7.3.1"
   }
