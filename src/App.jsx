@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import { Container } from 'react-bootstrap';
 import Header from './components/Header';
 import Footer from './components/Footer';
+import CreateEditPost from "./components/CreateEditPost";
 
 // Placeholder route views
 const Home = () => <div className="py-5"><h2>Landing Page</h2><p>Welcome to NeedleThreads cosplay and craft community!</p></div>;
@@ -22,7 +23,8 @@ export default function App() {
                     <Route path="/" element={<Home />} />
                     <Route path="/hubs" element={<Hubs />} />
                     <Route path="/posts/:id" element={<BuildLogDetail />} />
-                    <Route path="/create" element={<CreatePost />} />
+                    <Route path="/create" element={<CreateEditPost />} />
+                    <Route path="/edit/:id" element={<CreateEditPost />} />
                     <Route path="/search" element={<Search />} />
                     <Route path="/profile" element={<Profile />} />
                     <Route path="/settings" element={<Settings />} />
