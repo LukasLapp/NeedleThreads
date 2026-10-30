@@ -40,6 +40,39 @@ app.get('/api/posts', (req, res) => {
     }
 });
 
+// Helper Function for material and tag insertions
+function syncMaterialsAndTags(postId, materials = [], tags = []) {
+    // Sync Materials
+    db.prepare('DELETE FROM post_materials WHERE post_id = ?').run(postId);
+    const insertMat = db.prepare('INSERT OR IGNORE INTO materials (name) VALUES (?)');
+    const getMat = db.prepare('SELECT id FROM materials WHERE name = ?');
+    const linkMat = db.prepare('INSERT INTO post_materials (post_id, material_id) VALUES (?, ?)');
+
+    for (const matName of materials) {
+        const cleanName = matName.trim();
+        if (cleanName) {
+            insertMat.run(cleanName);
+            const mat = getMat.get(cleanName);
+            linkMat.run(postId, mat.id);
+        }
+    }
+
+    // Sync Tags
+    db.prepare('DELETE FROM post_tags WHERE post_id = ?').run(postId);
+    const insertTag = db.prepare('INSERT OR IGNORE INTO tags (name) VALUES (?)');
+    const getTag = db.prepare('SELECT id FROM tags WHERE name = ?');
+    const linkTag = db.prepare('INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)');
+
+    for (const tagName of tags) {
+        const cleanTag = tagName.trim();
+        if (cleanTag) {
+            insertTag.run(cleanTag);
+            const tag = getTag.get(cleanTag);
+            linkTag.run(postId, tag.id);
+        }
+    }
+}
+
 // GET /api/posts/:id - Single item
 app.get('/api/posts/:id', (req, res) => {
     try {
@@ -67,46 +100,65 @@ app.get('/api/posts/:id', (req, res) => {
 
 // POST /api/posts
 app.post('/api/posts', (req, res) => {
-    const {title, author_id, hub_id, content, completion_pct, materials = [], tags = []} = req.body;
+    const { title, author_id, hub_id, content, completion_pct, materials, tags } = req.body;
 
-    if (!title || !author_id || !hub_id || !content) {
+    if (!title || !title.trim() || !author_id || !hub_id || !content || !content.trim()) {
         return res.status(400).json({ error: 'Missing required fields: title, author_id, hub_id, content' });
+    }
+
+    const pct = parseInt(completion_pct, 10) || 0;
+    if (pct < 0 || pct > 100) {
+        return res.status(400).json({ error: 'Completion percentage must be between 0 and 100' });
     }
 
     const createPost = db.transaction(() => {
         const stmt = db.prepare('INSERT INTO posts (title, author_id, hub_id, content, completion_pct) \n' +
-            '      VALUES (?, ?, ?, ?, ?)');
-        const info = stmt.run(title, author_id, hub_id, content, completion_pct || 0);
+            'VALUES (?, ?, ?, ?, ?)');
+        const info = stmt.run(title.trim(), author_id, hub_id, content.trim(), pct);
         const postId = info.lastInsertRowid;
 
-        // Attach materials
-        const insertMat = db.prepare('INSERT OR IGNORE INTO materials (name) VALUES (?)');
-        const getMat = db.prepare('SELECT id FROM materials WHERE name = ?');
-        const linkMat = db.prepare('INSERT INTO post_materials (post_id, material_id) VALUES (?, ?)');
-
-        for (const matName of materials) {
-            insertMat.run(matName.trim());
-            const mat = getMat.get(matName.trim());
-            linkMat.run(postId, mat.id);
-        }
-
-        // Attach tags
-        const insertTag = db.prepare('INSERT OR IGNORE INTO tags (name) VALUES (?)');
-        const getTag = db.prepare('SELECT id FROM tags WHERE name = ?');
-        const linkTag = db.prepare('INSERT INTO post_tags (post_id, tag_id) VALUES (?, ?)');
-
-        for (const tagName of tags) {
-            insertTag.run(tagName.trim());
-            const tag = getTag.get(tagName.trim());
-            linkTag.run(postId, tag.id);
-        }
-
+        syncMaterialsAndTags(postId, materials, tags);
         return postId;
     });
 
     try {
         const postId = createPost();
-        res.status(201).json({ id: postId, message: 'Build log created successfully' });
+        res.status(201).json({ id: postId, message: 'Build log successfully created' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// PUT /api/posts/:id
+app.put('/api/posts/:id', (req, res) => {
+    const postId = req.params.id;
+    const { title, hub_id, content, completion_pct, materials, tags } = req.body;
+
+    const existingPost = db.prepare('SELECT id FROM posts WHERE id = ?').get(postId);
+    if (!existingPost) {
+        return res.status(404).json({ error: 'Post not found' });
+    }
+
+    if (!title || !title.trim() || !hub_id || !content || !content.trim()) {
+        return res.status(400).json({ error: 'Missing required fields: title, hub_id, content' });
+    }
+
+    const pct = parseInt(completion_pct, 10) || 0;
+    if (pct < 0 || pct > 100) {
+        return res.status(400).json({ error: 'Completion percentage must be between 0 and 100' });
+    }
+
+    const updatePost = db.transaction(() => {
+        db.prepare('UPDATE posts\n' +
+            'SET title = ?, hub_id = ?, content = ?, completion_pct = ?, updated_at = CURRENT_TIMESTAMP\n' +
+            'WHERE id = ?').run(title.trim(), hub_id, content.trim(), pct, postId);
+
+        syncMaterialsAndTags(postId, materials, tags);
+    });
+
+    try {
+        updatePost();
+        res.status(200).json({ id: postId, message: 'Build log successfully updated' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -117,7 +169,7 @@ app.delete('/api/posts/:id', (req, res) => {
     try {
         const info = db.prepare('DELETE FROM posts WHERE id = ?').run(req.params.id);
         if (info.changes === 0) return res.status(404).json({ error: 'Post not found' });
-        res.status(200).json({ message: 'Post deleted' });
+        res.status(200).json({ message: 'Post successfully deleted' });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -130,7 +182,7 @@ app.get('/{*splat}', (req, res) => {
 
 if (require.main === module){
     app.listen(PORT, () => {
-        console.log('NeedleThreads running on port ${PORT}');
+        console.log(`NeedleThreads running on port ${PORT}`);
     });
 }
 
