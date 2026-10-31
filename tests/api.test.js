@@ -48,6 +48,28 @@ describe('NeedleThreads Checkpoint 1 API & DB Integration Tests', () => {
         expect(res.body.tags).toContain('Armor');
     });
 
+    it('PUT /api/posts/:id should update post details and re-sync junction tables', async () => {
+        const updatePayload = {
+            title: 'EVA Foam Helmet Build - Completed',
+            hub_id: hubId,
+            content: 'Cut 10mm high density foam templates and heat-shaped with heat gun.',
+            completion_pct: 100,
+            materials: ['EVA Foam', 'Barge Cement', 'Acrylic Paint'],
+            tags: ['Armor', 'Props', 'Finished']
+        };
+
+        const res = await request(app).put(`/api/posts/${postId}`).send(updatePayload);
+        expect(res.statusCode).toBe(200);
+
+        // Verify updated values via GET
+        const getRes = await request(app).get(`/api/posts/${postId}`);
+        expect(getRes.statusCode).toBe(200);
+        expect(getRes.body.title).toBe('EVA Foam Helmet Build - Completed');
+        expect(getRes.body.completion_pct).toBe(100);
+        expect(getRes.body.materials).toContain('Acrylic Paint');
+        expect(getRes.body.tags).toContain('Finished');
+    });
+
     it('DELETE /api/posts/:id should remove the post', async () => {
         const res = await request(app).delete(`/api/posts/${postId}`);
         expect(res.statusCode).toBe(200);
