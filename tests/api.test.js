@@ -78,3 +78,40 @@ describe('NeedleThreads Checkpoint 1 API & DB Integration Tests', () => {
         expect(checkRes.statusCode).toBe(404);
     });
 });
+
+describe('Checkpoint 4 Single-Item Conditional Retrieval Tests', () => {
+    let testPostId;
+
+    beforeAll(async () => {
+        const res = await request(app).post('/api/posts').send({
+            title: 'Conditional Retrieval Test Post',
+            author_id: 1,
+            hub_id: 1,
+            content: 'Testing retrieval logic by ID',
+            completion_pct: 75,
+            materials: ['Foam Board'],
+            tags: ['Test']
+        });
+        testPostId = res.body.id;
+    });
+
+    it('GET /api/posts/:id should return 200 and single post object for valid ID', async () => {
+        const res = await request(app).get(`/api/posts/${testPostId}`);
+        expect(res.statusCode).toBe(200);
+        expect(res.body.id).toBe(testPostId);
+        expect(res.body.title).toBe('Conditional Retrieval Test Post');
+        expect(res.body.materials).toContain('Foam Board');
+    });
+
+    it('GET /api/posts/:id should return 404 for non-existent post ID', async () => {
+        const res = await request(app).get('/api/posts/999999');
+        expect(res.statusCode).toBe(404);
+        expect(res.body).toHaveProperty('error', 'Post not found');
+    });
+
+    it('GET /api/posts/:id/comments should return comments list for given post', async () => {
+        const res = await request(app).get(`/api/posts/${testPostId}/comments`);
+        expect(res.statusCode).toBe(200);
+        expect(Array.isArray(res.body)).toBe(true);
+    });
+});
