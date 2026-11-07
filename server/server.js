@@ -26,19 +26,6 @@ app.get('/api/hubs', (req, res) => {
 });
 
 // --API Endpoints--
-// GET /api/posts
-app.get('/api/posts', (req, res) => {
-    try {
-        const posts = db.prepare('SELECT post.*, user.username as author_name, hub.name as hub_name \n' +
-            '      FROM posts post\n' +
-            '      JOIN users user ON post.author_id = user.id\n' +
-            '      JOIN hubs hub ON post.hub_id = hub.id\n' +
-            '      ORDER BY post.created_at DESC').all();
-        res.json(posts);
-    } catch (err) {
-        res.status(500).json({error: err.message});
-    }
-});
 
 // Helper Function for material and tag insertions
 function syncMaterialsAndTags(postId, materials = [], tags = []) {
@@ -76,9 +63,9 @@ function syncMaterialsAndTags(postId, materials = [], tags = []) {
 // GET /api/posts/:id - Single item
 app.get('/api/posts/:id', (req, res) => {
     try {
-        const post = db.prepare('SELECT post.*, user.username as author_name, hub.name as hub_name \n' +
+        const post = db.prepare('SELECT post.*, u.username as author_name, hub.name as hub_name \n' +
             '      FROM posts post\n' +
-            '      JOIN users user ON post.author_id = user.id\n' +
+            '      JOIN users u ON post.author_id = u.id\n' +
             '      JOIN hubs hub ON post.hub_id = hub.id\n' +
             '      WHERE post.id = ?').get(req.params.id);
         if (!post) return res.status(404).json({error: 'Post not found'});
@@ -103,9 +90,9 @@ app.get('/api/posts', (req, res) => {
     try {
         const { hub_id } = req.query;
         let query = `
-            SELECT post.*, user.username as author_name, hub.name as hub_name 
+            SELECT post.*, u.username as author_name, hub.name as hub_name 
             FROM posts post
-            JOIN users user ON post.author_id = user.id
+            JOIN users u ON post.author_id = u.id
             JOIN hubs hub ON post.hub_id = hub.id
         `;
         const params = [];
@@ -128,9 +115,9 @@ app.get('/api/posts', (req, res) => {
 app.get('/api/posts/:id/comments', (req, res) => {
     try {
         const comments = db.prepare(`
-            SELECT comment.*, user.username as author_name 
+            SELECT comment.*, u.username as author_name 
             FROM comments comment
-            JOIN users user ON comment.author_id = user.id
+            JOIN users u ON comment.author_id = u.id
             WHERE comment.post_id = ?
             ORDER BY comment.created_at ASC
         `).all(req.params.id);
@@ -192,9 +179,9 @@ app.post('/api/posts/:id/comments', (req, res) => {
         const info = stmt.run(postId, author_id, content.trim(), parent_id || null);
 
         const newComment = db.prepare(`
-            SELECT comment.*, user.username as author_name 
+            SELECT comment.*, u.username as author_name 
             FROM comments comment
-            JOIN users user ON comment.author_id = user.id
+            JOIN users u ON comment.author_id = u.id
             WHERE comment.id = ?
         `).get(info.lastInsertRowid);
 
