@@ -164,26 +164,41 @@ app.post('/api/posts/:id/comments', (req, res) => {
     const postId = req.params.id;
     const { author_id, content, parent_id } = req.body;
 
-    if (!author_id || !content || !content.trim()) {
-        return res.status(400).json({ error: 'Comment content and author_id are required' });
+    if (!content || !content.trim()) {
+        return res.status(400).json({ error: 'Comment content is required' });
     }
 
     const post = db.prepare('SELECT id FROM posts WHERE id = ?').get(postId);
     if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    // Validate if the requested user exists; fallback to the first user in the DB
+    let validAuthorId = author_id;
+    const userExists = validAuthorId
+        ? db.prepare('SELECT id FROM users WHERE id = ?').get(validAuthorId)
+        : null;
+
+    if (!userExists) {
+        const defaultUser = db.prepare('SELECT id FROM users ORDER BY id ASC LIMIT 1').get();
+        if (!defaultUser) {
+            return res.status(400).json({ error: 'No valid user found in database to attach comment.' });
+        }
+        validAuthorId = defaultUser.id;
+    }
 
     try {
         const stmt = db.prepare(`
             INSERT INTO comments (post_id, author_id, content, parent_id)
             VALUES (?, ?, ?, ?)
         `);
-        const info = stmt.run(postId, author_id, content.trim(), parent_id || null);
+        const info = stmt.run(postId, validAuthorId, content.trim(), parent_id || null);
+        const commentId = Number(info.lastInsertRowid);
 
         const newComment = db.prepare(`
-            SELECT comment.*, u.username as author_name 
-            FROM comments comment
-            JOIN users u ON comment.author_id = u.id
-            WHERE comment.id = ?
-        `).get(info.lastInsertRowid);
+            SELECT c.*, u.username as author_name
+            FROM comments c
+                     JOIN users u ON c.author_id = u.id
+            WHERE c.id = ?
+        `).get(commentId);
 
         res.status(201).json(newComment);
     } catch (err) {

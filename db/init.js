@@ -73,11 +73,28 @@ function initDb() {
         '      id INTEGER PRIMARY KEY AUTOINCREMENT,\n' +
         '      post_id INTEGER NOT NULL,\n' +
         '      author_id INTEGER NOT NULL,\n' +
+        '      parent_id INTEGER DEFAULT NULL,\n' +
         '      content TEXT NOT NULL,\n' +
         '      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,\n' +
         '      FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,\n' +
         '      FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE CASCADE\n' +
+        '      FOREIGN KEY (parent_id) REFERENCES comments(id) ON DELETE CASCADE\n' +
         '    );');
+
+    // Ensure parent_id column exists if updating an existing database file
+    const commentCols = db.prepare("PRAGMA table_info(comments)").all();
+    if (!commentCols.some(col => col.name === 'parent_id')) {
+        db.exec("ALTER TABLE comments ADD COLUMN parent_id INTEGER DEFAULT NULL;");
+    }
+
+    // Seed default user if empty
+    const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
+    if (userCount.count === 0) {
+        db.prepare(`
+            INSERT INTO users (id, username, email, bio) 
+            VALUES (1, 'MakerOne', 'maker@needlethreads.io', 'Default crafter portfolio')
+        `).run();
+    }
 
     // Seed default craft hubs if empty
     const count = db.prepare('SELECT COUNT(*) as count FROM hubs').get();

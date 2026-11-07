@@ -37,14 +37,24 @@ export default function BuildLogDetail() {
         fetch(`/api/posts/${id}/comments`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ author_id: 1, content: newComment, parent_id: replyTo })
+            body: JSON.stringify({
+                author_id: 1, // Will fall back gracefully on server if ID 1 isn't present
+                content: newComment,
+                parent_id: replyTo
+            })
         })
-            .then(res => res.json())
-            .then(added => {
-                setComments(prev => [...prev, added]);
+            .then(async (res) => {
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to post comment');
+                return data;
+            })
+            .then(() => fetch(`/api/posts/${id}/comments`).then(r => r.json()))
+            .then(refreshedComments => {
+                setComments(refreshedComments);
                 setNewComment('');
                 setReplyTo(null);
-            });
+            })
+            .catch(err => alert(`Comment error: ${err.message}`));
     };
 
     const handleDeletePost = () => {
