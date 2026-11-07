@@ -98,6 +98,49 @@ app.get('/api/posts/:id', (req, res) => {
     }
 });
 
+// GET /api/posts - All posts or filtered by hub_id
+app.get('/api/posts', (req, res) => {
+    try {
+        const { hub_id } = req.query;
+        let query = `
+            SELECT post.*, user.username as author_name, hub.name as hub_name 
+            FROM posts post
+            JOIN users user ON post.author_id = user.id
+            JOIN hubs hub ON post.hub_id = hub.id
+        `;
+        const params = [];
+
+        if (hub_id) {
+            query += ` WHERE post.hub_id = ?`;
+            params.push(hub_id);
+        }
+
+        query += ` ORDER BY post.created_at DESC`;
+
+        const posts = db.prepare(query).all(...params);
+        res.json(posts);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/posts/:id/comments - Retrieve post comments
+app.get('/api/posts/:id/comments', (req, res) => {
+    try {
+        const comments = db.prepare(`
+            SELECT comment.*, user.username as author_name 
+            FROM comments comment
+            JOIN users user ON comment.author_id = user.id
+            WHERE comment.post_id = ?
+            ORDER BY comment.created_at ASC
+        `).all(req.params.id);
+
+        res.json(comments);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // POST /api/posts
 app.post('/api/posts', (req, res) => {
     const { title, author_id, hub_id, content, completion_pct, materials, tags } = req.body;
@@ -124,6 +167,38 @@ app.post('/api/posts', (req, res) => {
     try {
         const postId = createPost();
         res.status(201).json({ id: postId, message: 'Build log successfully created' });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// POST /api/posts/:id/comments - Add new comment
+app.post('/api/posts/:id/comments', (req, res) => {
+    const postId = req.params.id;
+    const { author_id, content, parent_id } = req.body;
+
+    if (!author_id || !content || !content.trim()) {
+        return res.status(400).json({ error: 'Comment content and author_id are required' });
+    }
+
+    const post = db.prepare('SELECT id FROM posts WHERE id = ?').get(postId);
+    if (!post) return res.status(404).json({ error: 'Post not found' });
+
+    try {
+        const stmt = db.prepare(`
+            INSERT INTO comments (post_id, author_id, content, parent_id)
+            VALUES (?, ?, ?, ?)
+        `);
+        const info = stmt.run(postId, author_id, content.trim(), parent_id || null);
+
+        const newComment = db.prepare(`
+            SELECT comment.*, user.username as author_name 
+            FROM comments comment
+            JOIN users user ON comment.author_id = user.id
+            WHERE comment.id = ?
+        `).get(info.lastInsertRowid);
+
+        res.status(201).json(newComment);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
